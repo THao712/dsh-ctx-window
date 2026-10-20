@@ -1,126 +1,180 @@
-# Context Window (`@local/ctx-window`)
+# Context Window for DeepSeek Harness
 
-A compact **上下文 / Context** selector in the chat composer for the two local
-reverse-proxy gateways whose upstream honours a configurable window (**Qoder**,
-**Trae**). Picking a value rewrites that exact model's `contextWindow` in the
-`llm-pi-ai` provider catalog through Harness's published `settings` Remote — the
-same write the Models settings page performs — so the context budget, the context
-meter, and the compaction threshold really use the chosen number.
+[English](README.md) | [简体中文](README.zh-CN.md) | [日本語](README.ja.md) | [한국어](README.ko.md)
 
-## Install
+![License](https://img.shields.io/badge/license-MIT-blue.svg)
+![Platform](https://img.shields.io/badge/platform-DeepSeek%20Harness%20%3E%3D%200.2.1--rc.2-informational)
 
-The bundle is a normal Harness plugin package: `package.json` declares
-`dsh.bundle.patch` and `dsh.client`, and `cordis.patch.yml` inserts the row.
+A DeepSeek Harness bundle that adds a compact context-window selector to the chat
+composer for models served by **Qoder** and **Trae** reverse-proxy gateways.
+
+The selected value is written to the model's own `contextWindow` in the provider
+catalog through Harness's published settings API. It is therefore the value the
+runtime actually uses to price a request, to render the context meter, and to
+decide when compaction starts — not a label or a cached annotation.
+
+---
+
+## Overview
+
+Harness derives a conversation's token budget exclusively from the adapter
+metadata of the selected model. There is no session-level override, so the only
+supported lever is the provider catalog entry itself.
+
+This bundle exposes that lever as a one-click control, restricted to the gateways
+whose upstream service genuinely honours a configurable window, and restricted to
+the windows each model actually publishes.
+
+## How it works
+
+The bundle registers a single entry in the `conversation.input.right` slot. On
+selection it performs one `settings/mutate` call:
+
+```text
+llm-pi-ai → providers.<provider>.models[<index>].contextWindow = <tokens>
+```
+
+This is the same write the Models settings page performs, so it needs no
+elevated access and leaves no side channel. Harness then derives, from that
+catalog entry:
+
+- `request/context.contextWindow`, the value recorded for every request;
+- the denominator of the context-usage meter;
+- the compaction threshold of `dsh-compaction-basic`.
+
+No monkey-patching, no DOM injection, no `localStorage`, no credential access.
+
+## Supported gateways
+
+Only gateways whose upstream honours a configurable window are covered.
+**WorkBuddy is deliberately excluded**: its service does not accept a selectable
+window, so offering the control there would promise something it cannot deliver.
+
+A gateway is identified by provider id first (`qoder-intl-proxy`,
+`qoder-cn-proxy`, `trae-proxy`), then by a loopback `baseURL` on the matching
+port (8790, 8000). Renamed providers therefore still match, and a remote provider
+never does.
+
+### Qoder
+
+Qoder publishes a per-model set of legal windows. The menu lists only those
+values; a model with a single published window is shown as a fixed chip.
+
+| Models | 国内版 (cn) | 国际版 (intl) |
+|---|---|---|
+| `Auto` | 200K (fixed) | 200K (fixed) |
+| `Qwen3.8-Max`, `Qwen3.8-Flash`, `Qwen3.7-Max`, `Qwen3.7-Plus`, `Qwen3.7-Flash` | 200K / 400K / 1M | 200K / 400K / 1M |
+| `DeepSeek-V4-Pro`, `DeepSeek-Flash` | 200K / 400K / 1M | 200K / 400K / 1M |
+| `GLM-5.3`, `GLM-5.3-Flash`, `GLM-5.2` | 200K / 400K / 1M | 200K / 400K / 1M |
+| `Kimi-K3`, `Kimi-K2.8-Preview` | 200K / 400K / 1M | 200K / 400K / 1M |
+| MiniMax | 200K (fixed) | 200K / 400K / 1M |
+| `Ultimate`, `Sonus`, `Cantus` | — | 200K / 400K / 1M |
+| `Performance` | — | 272K / 400K / 1M |
+| `Efficient` | — | 200K (fixed) |
+
+### Trae
+
+Trae exposes exactly two windows per model, read from the relay's own account
+catalog (`context_window_tokens.dev` and `.max`): a standard window and an
+optional 1M profile.
+
+| Models | Standard | 1M profile |
+|---|---|---|
+| `deepseek-v4.1-flash`, `DeepSeek-V4-Flash-Official`, `DeepSeek-V4-Pro-Official`, `glm-5.2`, `glm-5.3`, `glm-5.3-flash`, `glm-5.3-flashx`, `kimi-k3`, `minimax-m3`, `minimax-m3.1-flash`, `qwen3.8-max`, `qwen-3.7-plus`, `step-5-preview` | 200K | 1M |
+| `mimo-v2.6-flash`, `mimo-v2.6-pro` | 200K | 981,504 |
+| `Doubao-Seed-2.1-Pro`, `Doubao-Seed-Evolving` | 256K | 1M |
+| `Doubao-Seed-2.1-Turbo`, `Doubao-Seed-Code` | 256K | — (fixed) |
+| `kimi-k2.6`, `kimi-k2.7-code` | 200K | — (fixed) |
+
+The 1M profile is a capability of the relay, not of this bundle: if the relay's
+own Max-mode switch is turned off, requests made at 1M fall back or fail. Select
+the standard window in that case.
+
+## Installation
+
+The bundle is an ordinary Harness plugin package: `package.json` declares
+`dsh.bundle.patch` and `dsh.client`, and `cordis.patch.yml` inserts the plugin
+row.
 
 ```text
 plugin_manager.install_bundle  github:THao712/dsh-ctx-window
 ```
 
-A local checkout works the same way — pass its directory instead of the GitHub
-spec. Requires DeepSeek Harness 0.2.1-rc.2 or newer, a `llm-pi-ai` provider row
-with `qoder-intl-proxy` / `qoder-cn-proxy` / `trae-proxy` entries, and a page
-refresh after the first install (the client module only loads on boot).
+A local checkout is installed the same way, by passing its directory instead of
+the GitHub specification.
 
-## Where it shows up
+Requirements:
 
-`conversation.input.right` (compact controls just before the composer submit
-button), hidden unless the session's current model belongs to a gateway:
+- DeepSeek Harness 0.2.1-rc.2 or newer;
+- an `llm-pi-ai` provider row containing at least one supported gateway;
+- one page refresh after the first installation, because client modules are
+  loaded at boot.
 
-| Gateway | Providers | Local port | Suggested |
-|---|---|---|---|
-| Qoder | `qoder-intl-proxy`, `qoder-cn-proxy` | 8790 | 400K |
-| Trae | `trae-proxy` | 8000 | 1M |
+## Usage
 
-WorkBuddy (`wb-intl-proxy`, `wb-cn-proxy`, port 8788) is deliberately **not**
-covered: its upstream does not honour a selectable window, so showing a control
-there would promise something it cannot deliver.
+1. Select a model from a supported gateway.
+2. Open the **Context** control beside the composer's submit button.
+3. Choose a window. The menu shows the catalog baseline, the window used by the
+   previous request, and a warning when the chosen value exceeds the baseline.
 
-Identification is by provider id, then by a loopback `baseURL` on that port, so a
-renamed provider still matches and a remote provider never does. It never reads,
-logs, or displays a credential.
+Every model also offers **Auto (model default)**, which restores the value
+captured before this bundle wrote anything, and a validated custom integer
+(`1 … 4,000,000`) for windows a gateway accepts but does not publish.
 
-## What a choice does
+The value takes effect on the **next** request; the current request keeps the
+window it was prepared with. The menu reports both, so a write that has not yet
+been used is visible rather than implied.
 
-`设置 → providers.<id>.models[<i>].contextWindow` for the exact model.
-Because Harness derives `request/context.contextWindow`, the context-usage
-percentage, and `dsh-compaction-basic`'s threshold from that adapter metadata, the
-next request runs with the new budget.
+## Verification
 
-Qoder publishes a **per-model** set of legal windows, so the menu lists only the
-tiers that model actually supports (unknown Qoder models fall back to
-`200K / 400K / 1M`):
+Verified against a live instance:
 
-| Model | 国内版 | 国际版 |
-|---|---|---|
-| Auto | 200K (fixed) | 200K (fixed) |
-| Qwen3.8-Max / 3.8-Flash / 3.7-Max / 3.7-Plus / 3.7-Flash | 1M / 200K / 400K | 1M / 200K / 400K |
-| DeepSeek-V4-Pro / DeepSeek-Flash | 1M / 200K / 400K | 1M / 200K / 400K |
-| GLM-5.3 / GLM-5.3-Flash / GLM-5.2 | 1M / 200K / 400K | 1M / 200K / 400K |
-| Kimi-K3 / Kimi-K2.8-Preview | 1M / 200K / 400K | 1M / 200K / 400K |
-| MiniMax | 200K (fixed) | 1M / 200K / 400K |
-| Ultimate / Sonus / Cantus | — | 1M / 200K / 400K |
-| Performance | — | 272K / 1M / 400K |
-| Efficient | — | 200K (fixed) |
+- Selection on `qoder-cn-proxy` → `DeepSeek-Flash` wrote
+  `contextWindow: 400000` into the profile catalog, leaving every other model of
+  that provider unchanged.
+- The next request recorded
+  `{provider: "qoder-cn-proxy", model: "DeepSeek-Flash", contextWindow: 400000}`
+  in `request/context`, and the gateway served it.
+- `trae-proxy` → `deepseek-v4.1-flash` at `1,000,000` was recorded with
+  `contextWindow: 1000000` on two consecutive requests, both answered.
 
-A fixed-window model keeps a **disabled** chip showing its window: there is
-nothing to choose, and the tooltip says so. Every entry also offers
-**自动（模型默认）** (restores the catalog value captured before this plugin wrote
-anything) and a validated custom positive integer (`1 … 4,000,000`), so a value
-outside the published tiers is still reachable when a gateway accepts one.
+## Design limits
 
-Trae exposes exactly **two** windows per model, taken from the relay's own
-account catalog (`context_window_tokens.dev` / `.max`) — the standard window and
-the optional 1M profile:
+A context window belongs to the **model**, not to the session. Harness exposes no
+per-session override: `LlmCallConfig` carries no window field, adapters are
+exclusive per provider, and there is no resolution interceptor. This bundle
+therefore changes the catalog entry for every session that uses that model, and
+two sessions of the same model cannot hold different windows.
 
-| Model | Standard | 1M profile |
-|---|---|---|
-| deepseek-v4.1-flash, DeepSeek-V4-{Flash,Pro}-Official, glm-5.2/5.3/5.3-flash/5.3-flashx, kimi-k3, minimax-m3 / m3.1-flash, qwen3.8-max, qwen-3.7-plus, step-5-preview | 200K | 1M |
-| mimo-v2.6-flash, mimo-v2.6-pro | 200K | 981,504 |
-| Doubao-Seed-2.1-Pro, Doubao-Seed-Evolving | 256K | 1M |
-| Doubao-Seed-2.1-Turbo, Doubao-Seed-Code | 256K | — (fixed) |
-| kimi-k2.6, kimi-k2.7-code | 200K | — (fixed) |
+The selector constrains the menu to windows each model publishes; it does not
+verify that the upstream will honour an arbitrary custom value. A request that
+exceeds the real capacity of the service is rejected by that service.
 
-So the selector for Trae offers `200K / 1M` (or `256K / 1M`), and the four models
-without a 1M profile get a fixed chip instead of a misleading 1M option.
-
-## Verified end to end
-
-1. Selector wrote through `settings` → `cordis.patch.yml` now carries
-   `qoder-cn-proxy` → `DeepSeek-Flash` → `contextWindow: 400000` (the other models
-   of that provider kept their original 180000/200000/96000).
-2. The very next request was priced with it: the session log's
-   `request/context` event records
-   `{provider: "qoder-cn-proxy", model: "DeepSeek-Flash", contextWindow: 400000}`
-   (the previous turn, on `deepseek-account/deepseek-flash`, recorded 1048576).
-3. The gateway served that request, so the Qoder 国内版 endpoint really accepts a
-   400K window.
-4. The same check passed for Trae: after `trae-proxy` → `deepseek-v4.1-flash` was
-   set to `1,000,000`, two consecutive `request/context` events recorded
-   `contextWindow: 1000000` and the model answered both times.
-
-### Known upstream flakiness (not this bundle)
+## Known upstream behaviour
 
 `trae-proxy` intermittently fails a step of a turn with
-`Object of type set is not JSON serializable` (`PI_AI_ERROR`, `usage` all zeros).
-It was already recorded on 2026-10-19, before this bundle existed, and it hits the
-first or a later step of a turn regardless of the configured window; when it
-happens the request never leaves the adapter, so retrying is the fix and the
-provider side is what needs repairing.
-
-## Deliberate limitation
-
-A context window is **per model, not per session** in Harness 0.2.1-rc.2: the
-value lives in the adapter's model metadata, which carries no session identity.
-This bundle therefore changes the model's catalog entry for every session that
-uses that model; it cannot keep two sessions of the same model on different
-windows. See the delivery report for the verified call path.
-
-The window is a token budget, not a promise about upstream capacity: raising a
-model above what its gateway really serves makes that gateway reject the request,
-and the menu says so before you apply it.
+`Object of type set is not JSON serializable` (`PI_AI_ERROR`, all usage counters
+zero). The failure was observed before this bundle existed, occurs at the first
+or a later step of a turn independently of the configured window, and happens
+before the request leaves the adapter. Retrying is the remedy; the relay is what
+needs repair.
 
 ## Uninstall
 
-Disable or remove the bundle; the plugin holds no service, listener, or session
-state. Model values it already wrote stay in `cordis.patch.yml`; set them back
-with **自动** or in Settings → Models.
+Disable or remove the bundle. It holds no service, listener, or session state.
+Values it has already written remain in the profile catalog and can be reverted
+with **Auto** or in the Models settings page.
+
+## Repository layout
+
+| Path | Purpose |
+|---|---|
+| `index.js` | Host half. Declares no configuration; documented in-file. |
+| `client.js` | Entire feature: slot registration, gateway detection, tier tables, selector. |
+| `cordis.patch.yml` | Inserts the `ctx-window` plugin row. |
+| `locale/*.json` | Plugin name and description for the settings page. |
+| `icon.svg` | Original window glyph. |
+
+## License
+
+MIT. See [LICENSE](LICENSE).
