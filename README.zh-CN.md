@@ -69,6 +69,17 @@ Trae 每个模型只有两个窗口，取自反代自身的账号目录（`conte
 
 1M 档属于反代的能力，而非本插件：若反代自身的 Max 模式开关被关闭，以 1M 发出的请求会回退或失败，此时请选择标准窗口。
 
+## 网关实现
+
+本插件只修改目录中的窗口值，既不实现也不代理任何上游。它面向的两个网关是独立项目：
+
+| 网关 | 实现 |
+|---|---|
+| Qoder | [`shuishuipingan/qoder2api-hub`](https://github.com/shuishuipingan/qoder2api-hub) |
+| Trae | [`autumnsentiment/Trae2api-cn`](https://github.com/autumnsentiment/Trae2api-cn) |
+
+需要先部署其中一个，并作为 `llm-pi-ai` 供应商接入，本插件才有可操作的对象。上文列出的按模型窗口取自各网关自身公布的数据——Qoder 的模型目录，以及 Trae 反代账号中的 `context_window_tokens`；若网关调整了窗口，需要同步更新这些表格，菜单才会与之一致。
+
 ## 安装
 
 插件是普通的 Harness 插件包：`package.json` 声明 `dsh.bundle.patch` 与 `dsh.client`，`cordis.patch.yml` 插入对应插件行。

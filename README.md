@@ -90,6 +90,22 @@ The 1M profile is a capability of the relay, not of this bundle: if the relay's
 own Max-mode switch is turned off, requests made at 1M fall back or fail. Select
 the standard window in that case.
 
+## Gateway implementations
+
+This bundle changes a catalog value; it neither implements nor proxies an
+upstream. The gateways it targets are independent projects:
+
+| Gateway | Implementation |
+|---|---|
+| Qoder | [`shuishuipingan/qoder2api-hub`](https://github.com/shuishuipingan/qoder2api-hub) |
+| Trae | [`autumnsentiment/Trae2api-cn`](https://github.com/autumnsentiment/Trae2api-cn) |
+
+Deploy one of them first and expose it as an `llm-pi-ai` provider; only then does
+this bundle have something to act on. The per-model windows listed above follow
+what each gateway publishes — Qoder's model catalog, and the Trae relay's account
+`context_window_tokens` — so if a gateway revises a window, these tables need
+refreshing before the menu matches again.
+
 ## Installation
 
 The bundle is an ordinary Harness plugin package: `package.json` declares

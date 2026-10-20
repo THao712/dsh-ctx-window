@@ -69,6 +69,17 @@ Trae는 모델마다 정확히 두 개의 윈도우를 가집니다. 릴레이 �
 
 1M 프로파일은 이 번들이 아니라 릴레이의 기능입니다. 릴레이 자체의 Max 모드 스위치가 꺼져 있으면 1M로 보낸 요청은 폴백되거나 실패합니다. 이 경우 표준 윈도우를 선택하십시오.
 
+## 게이트웨이 구현
+
+이 번들은 카탈로그 값을 변경할 뿐, 업스트림을 구현하거나 프록시하지 않습니다. 대상 게이트웨이는 별도의 프로젝트입니다.
+
+| 게이트웨이 | 구현 |
+|---|---|
+| Qoder | [`shuishuipingan/qoder2api-hub`](https://github.com/shuishuipingan/qoder2api-hub) |
+| Trae | [`autumnsentiment/Trae2api-cn`](https://github.com/autumnsentiment/Trae2api-cn) |
+
+둘 중 하나를 먼저 배포하고 `llm-pi-ai` 프로바이더로 연결해야 이 번들이 의미를 가집니다. 위에 정리한 모델별 윈도우는 각 게이트웨이가 공개하는 값(Qoder의 모델 카탈로그, Trae 릴레이의 계정 `context_window_tokens`)을 따르므로, 게이트웨이가 윈도우를 변경하면 이 표를 갱신해야 합니다.
+
 ## 설치
 
 이 번들은 일반적인 Harness 플러그인 패키지입니다. `package.json`이 `dsh.bundle.patch`와 `dsh.client`를 선언하고, `cordis.patch.yml`이 플러그인 행을 삽입합니다.

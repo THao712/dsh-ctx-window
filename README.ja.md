@@ -69,6 +69,17 @@ Trae はモデルごとに 2 つのウィンドウのみを持ちます。リレ
 
 1M プロファイルは本バンドルではなくリレー側の機能です。リレー自身の Max モードが無効な場合、1M でのリクエストはフォールバックするか失敗します。その場合は標準ウィンドウを選択してください。
 
+## ゲートウェイ実装
+
+本バンドルはカタログの値を変更するだけで、上流の実装やプロキシは行いません。対象となる 2 つのゲートウェイは独立したプロジェクトです。
+
+| ゲートウェイ | 実装 |
+|---|---|
+| Qoder | [`shuishuipingan/qoder2api-hub`](https://github.com/shuishuipingan/qoder2api-hub) |
+| Trae | [`autumnsentiment/Trae2api-cn`](https://github.com/autumnsentiment/Trae2api-cn) |
+
+いずれかを先に導入し、`llm-pi-ai` のプロバイダーとして接続してから、本バンドルは意味を持ちます。上記のモデル別ウィンドウは各ゲートウェイが公表している値（Qoder のモデルカタログ、Trae リレーのアカウント `context_window_tokens`）に基づくため、ゲートウェイ側でウィンドウが変更された場合は、この表を更新する必要があります。
+
 ## インストール
 
 本バンドルは通常の Harness プラグインパッケージです。`package.json` が `dsh.bundle.patch` と `dsh.client` を宣言し、`cordis.patch.yml` がプラグイン行を挿入します。
