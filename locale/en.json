@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Context Window",
+    "description": "Choose the context window for Qoder, WorkBuddy, and Trae gateway models. The value is written to that model's catalog entry, so the context budget, the context meter, and the compaction threshold use it."
+  }
+}
