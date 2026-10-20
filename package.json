@@ -1,6 +1,6 @@
 {
   "name": "@local/ctx-window",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "type": "module",
   "description": "Context-window selector for the Qoder and Trae reverse-proxy gateway models of DeepSeek Harness",
